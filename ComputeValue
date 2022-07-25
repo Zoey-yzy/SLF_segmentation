@@ -1,0 +1,86 @@
+%% compute fa val based on dt6 and fg
+data=fullfile('/home/fangrong/sharefolder/second_run/yzy/comp/');
+subs = textread(strcat(data,'/NewP.txt'),'%s');
+%fgfile = {'SLFI_L2_not.mat','SLFI_R2_not.mat','SLFII_L2_not.mat','SLFII_R2_not.mat','SLFIII_L2_not.mat','SLFIII_R2_not.mat'};
+
+numberOfNodes = 100;
+dFallOff = 1;
+roi1Names = {'SLF_roi1_L','SLF_roi1_R','SLF_roi1_L','SLF_roi1_R','SLF_roi1_L','SLF_roi1_R'};
+roi2Names = {'SLF1_roi2_L2','SLF1_roi2_R2','SLF2_roi2_L2','SLF2_roi2_R2','SLF3_roi2_L2','SLF3_roi2_R2'};
+for ii = 1:length(subs)
+    sub_dirs(ii) = strcat(data,subs(ii));
+    roiDir = fullfile(sub_dirs(ii),'ROIs');
+    dt = dtiLoadDt6(char(fullfile(sub_dirs(ii),'dti_dt6.mat')));
+    fg = dtiReadFibers(char(fullfile(sub_dirs(ii),'SLFs.mat')))
+    fgnum = length(fg);
+    fprintf('\nComputing %s', char(subs(ii)));
+    
+    fa = nan(numberOfNodes,fgnum);
+    md = nan(numberOfNodes,fgnum);
+    rd = nan(numberOfNodes,fgnum);
+    ad = nan(numberOfNodes,fgnum);
+    for jj =  1:fgnum
+        roi1path = fullfile(roiDir,[roi1Names{jj} '.mat']);
+        roi2path = fullfile(roiDir,[roi2Names{jj} '.mat']);
+        roi1 = dtiReadRoi(char(roi1path));
+        roi2 = dtiReadRoi(char(roi2path));
+        fg_now = fg(jj);
+        if isempty(fg_now.fibers)
+            fa(:,jj) = nan; md(:,jj) = nan; rd(:,jj) = nan; ad(:,jj) = nan; 
+       % cl(:,jj) = nan; cp(:,jj) = nan; cs(:,jj) = nan; volume(:,jj) = nan;
+            %TractProfile(jj) = AFQ_CreateTractProfile('name',fg_now.name);
+        else
+            [fa(:,jj),md(:,jj),rd(:,jj),ad(:,jj),~,~,~,~,~,~] = dtiComputeDiffusionPropertiesAlongFG(fg_now,dt,roi1,roi2,numberOfNodes,dFallOff);
+        end
+    end    
+    SLFdata(1,ii).FA = fa; SLFdata(1,ii).MD = md; SLFdata(1,ii).RD = rd; SLFdata(1,ii).AD = ad; 
+    % sub_val.CL = cl; 
+    SLFdata(1,ii).names = subs(ii);
+end
+
+save('SLF_data.mat','SLFdata');
+%%
+for ii = 1:7
+    for jj = 1:4
+        SLFdata(ii).FA(:,jj) = SLFdata(ii).FA(:,jj+2);
+        SLFdata(ii).RD(:,jj) = SLFdata(ii).RD(:,jj+2);
+        SLFdata(ii).AD(:,jj) = SLFdata(ii).AD(:,jj+2);
+        SLFdata(ii).MD(:,jj) = SLFdata(ii).MD(:,jj+2);
+    end
+end
+for ii = 1:7
+        SLFdata(ii).FA(:,6) = [];
+        SLFdata(ii).RD(:,6) = [];
+        SLFdata(ii).AD(:,6) = [];
+        SLFdata(ii).MD(:,6) = [];
+end
+for ii = 1:7
+        SLFdata(ii).FA(:,5) = [];
+        SLFdata(ii).RD(:,5) = [];
+        SLFdata(ii).AD(:,5) = [];
+        SLFdata(ii).MD(:,5) = [];
+end
+   for ii = 66:72
+       subsSLF_data(ii).name = SLFdata(ii-65).name;
+       subsSLF_data(ii).FA = SLFdata(ii-65).FA;
+       subsSLF_data(ii).RD = SLFdata(ii-65).RD;
+       subsSLF_data(ii).AD = SLFdata(ii-65).AD;
+       subsSLF_data(ii).MD = SLFdata(ii-65).MD;
+   end
+   
+%% supplement the tractprofile
+data = fullfile('/media/sf_F_DRIVE/second_run/yzy/comp/');
+subs = textread(strcat(data,'/all.txt'),'%s');
+numOfNodes = 100;
+clip2rois = 1;
+for ii = 1:length(subs)
+    sub_dirs(ii) = strcat(data,subs(ii));
+    dt = dtiLoadDt6(char(fullfile(sub_dirs(ii),'dti_dt6.mat')));
+    fg_classified = dtiReadFibers(char(fullfile(sub_dirs(ii),'fibers','MoriGroups_clean_D5_L4.mat')));
+    subDir = char(sub_dirs(ii));
+    [fa md rd ad cl volume TractProfile] = AFQ_ComputeTractProperties(fg_classified,dt,numOfNodes,clip2rois,subDir);
+    subval(1,ii).FA = fa; subval(1,ii).MD = md; subval(1,ii).RD = rd; subval(1,ii).AD = ad;
+    subval(1,ii).CL = cl; subval(1,ii).vol = volume; subval(1,ii).TractProfiles = TractProfile;
+end
+save('subval.mat','subval');
+
